@@ -1,34 +1,32 @@
-# Autonomous Run
+# Voice-Automated Autonomous Driving Simulation
 
-This project is a lightweight autonomous driving agent for a simulator. It uses a trained Keras/TensorFlow model to predict steering angles from camera images and sends control commands back to the simulator over a Socket.IO connection.
+This project is a lightweight autonomous driving agent for a simulator, enhanced with real-time voice control. It uses a trained Keras/TensorFlow deep learning model to predict steering angles from camera images, while running a parallel microservice to listen for specific vocal commands. This allows the user to manually override the autonomous system to stop, resume, or force directional turns using just their voice.
 
-## What the project does
+## What the Project Does
 
-The system works like this:
+The system utilizes a dual-process architecture to prevent the deep learning driving model from bottlenecking the speech recognition engine:
 
-1. The simulator sends telemetry data including the current vehicle speed and a camera image.
-2. The server decodes the image and preprocesses it to match the training format used by the model.
-3. A loaded neural network predicts a steering angle.
-4. The script computes a throttle value based on the target speed and sends both steering and throttle commands back to the simulator.
+1. **The Autonomous Engine (`drive.py`):** Receives telemetry data (speed, camera images) from the simulator via Socket.IO, preprocesses the images, predicts the steering angle using a loaded neural network, and computes throttle.
+2. **The Voice Controller (`voice_controller.py`):** Runs in a separate terminal, continuously listening for specific keywords (Stop, Start, Left, Right) using Google Speech Recognition.
+3. **The UDP Bridge:** When a voice command is recognized, the voice controller instantly sends a UDP network packet to the autonomous engine to override the throttle and steering values in real time.
 
-## Project files
+## Project Files
 
-- `drive.py` - Main server script that loads the model, receives simulator telemetry, predicts steering, and sends driving commands.
+- `Udacity Car Sim` - [https://github.com/udacity/self-driving-car-sim](https://github.com/udacity/self-driving-car-sim)
+- `drive.py` - Main server script that loads the model, receives simulator telemetry, listens for UDP voice overrides, and sends driving commands back to the simulator.
+- `voice_controller.py` - The independent voice-listening microservice that captures microphone input, filters for specific keywords, and transmits overrides to `drive.py`.
 - `model.h5` - Pretrained Keras model used for inference.
 - `requirements.txt` - Python dependencies required to run the project.
-- `Training Data Drive Link` - https://drive.google.com/file/d/1RjGounrgGelA2gwDLPSdO-lz11vN8pOx/view?usp=sharing
+- `Training Data Drive Link` - [https://drive.google.com/file/d/1RjGounrgGelA2gwDLPSdO-lz11vN8pOx/view?usp=sharing](https://drive.google.com/file/d/1RjGounrgGelA2gwDLPSdO-lz11vN8pOx/view?usp=sharing)
 
-## How it works
+## Supported Voice Commands
 
-The main logic is implemented in `drive.py`:
+The voice controller uses strict keyword filtering to ignore background noise and only act on specific triggers:
 
-- A Flask app and a Socket.IO server are initialized.
-- The `telemetry` event receives incoming data from the simulator.
-- The image is decoded from base64 and converted to a NumPy array.
-- The image is cropped, resized, and normalized to the same format expected during training.
-- The model predicts a steering angle.
-- A simple cruise-control-style throttle controller adjusts the throttle based on the current speed.
-- The server emits steering and throttle values back to the simulator.
+*   **"Stop"** (or "Brake"): Overrides the model, applies full negative throttle (-1.0), and halts the car.
+*   **"Start"** (or "Forward", "Go", "Resume"): Releases manual overrides and hands control back to the autonomous neural network.
+*   **"Left":** Forces the car to steer hard left (Steering Angle: -1.0).
+*   **"Right":** Forces the car to steer hard right (Steering Angle: 1.0).
 
 ## Requirements
 
@@ -36,49 +34,19 @@ This project depends on:
 
 - Python 3
 - TensorFlow / Keras
-- Flask
-- Flask-SocketIO
+- Flask & Flask-SocketIO
 - Eventlet
 - NumPy
-- OpenCV
-- Pillow
+- OpenCV & Pillow
 - h5py
+- SpeechRecognition
+- PyAudio
 
 ## Setup
 
-1. Create and activate a Python environment if desired.
+1. Create and activate a Python virtual environment.
 2. Install the required dependencies:
 
 ```bash
 pip install -r requirements.txt
-```
-
-3. Run the server with your model file:
-
-```bash
-python drive.py model.h5
-```
-
-## Usage
-
-After starting the server:
-
-- Open the simulator.
-- Connect it to the local server on port `4567`.
-- The script will begin receiving camera data and sending steering and throttle commands.
-
-## Notes
-
-- The image preprocessing in this project is intentionally simple and should match the preprocessing used during model training.
-- The model file must be compatible with the Keras loading code used in `drive.py`.
-- The server prints steering and throttle values in real time so you can monitor behavior while driving.
-
-## Example
-
-A typical run looks like this:
-
-```bash
-python drive.py model.h5
-```
-
-You should see output indicating that the model is loading and that the server is waiting for simulator connections.
+pip install SpeechRecognition pyaudio
